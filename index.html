@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Food Image Resizer (Smart Skip Small Files)</title>
+    <title>Food Image Resizer (Fix Multi-Download)</title>
     <style>
         body { font-family: sans-serif, Tahoma; padding: 20px; background: #f4f4f9; color: #333; max-width: 600px; margin: auto; }
         .card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 15px; }
@@ -17,7 +17,7 @@
 </head>
 <body>
 
-    <h2>🍱 ปรับรูปอาหาร (ข้ามรูปเล็กอัตโนมัติ)</h2>
+    <h2>🍱 ปรับรูปอาหาร (ดาวน์โหลดครบทุกรูป ไม่ตกหล่น)</h2>
     
     <div class="card">
         <label>1. เลือกรูปภาพ (หลายรูปพร้อมกัน):</label>
@@ -43,33 +43,37 @@ async function processImages() {
         return;
     }
 
-    document.getElementById('log').innerHTML = 'กำลังเริ่มตรวจสอบและประมวลผล...<br>';
+    document.getElementById('log').innerHTML = 'กำลังเริ่มประมวลผล...<br>';
 
+    let index = 0;
     for (let file of fileInput.files) {
+        index++;
         await new Promise((resolve) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = (event) => {
                 const img = new Image();
                 img.src = event.target.result;
-                img.onload = () => {
+                img.onload = async () => {
                     const fileSizeKB = file.size / 1024;
                     const imgWidth = img.width;
                     const imgHeight = img.height;
 
-                    // เงื่อนไขกันพลาด: ถ้ารูปมีขนาดไฟล์ต่ำกว่า 200 KB หรือ กว้าง/สูง ไม่เกิน 800 px ให้ข้ามการปรับแต่ง (ใช้ไฟล์เดิมเป๊ะๆ)
+                    // เงื่อนไขเดิม: ถ้ารูปเล็กหรือเบาอยู่แล้ว ใช้ไฟล์เดิม
                     if (fileSizeKB < 200 || (imgWidth <= targetSize && imgHeight <= targetSize)) {
                         const link = document.createElement('a');
                         link.href = event.target.result;
                         link.download = file.name;
                         link.click();
                         
-                        logDiv(`⏭️ ข้าม (รูปเล็กอยู่แล้ว): ${file.name} (${Math.round(fileSizeKB)} KB, ${imgWidth}x${imgHeight}px)`);
-                        resolve();
+                        logDiv(`⏭️ [${index}] ข้าม (รูปเล็ก): ${file.name}`);
+                        
+                        // หน่วงเวลา 300 มิลลิวินาที เพื่อให้เบราว์เซอร์ไม่บล็อกการดาวน์โหลดหลายไฟล์
+                        setTimeout(resolve, 300);
                         return;
                     }
 
-                    // ถ้ารูปใหญ่กว่าเกณฑ์ ค่อยนำมาปรับขนาด 800x800 + เติมขอบดำ
+                    // ถ้ารูปใหญ่ ทำการย่อ 800x800 + เติมขอบดำ
                     const canvas = document.createElement('canvas');
                     canvas.width = targetSize;
                     canvas.height = targetSize;
@@ -99,14 +103,16 @@ async function processImages() {
                         link.download = file.name;
                         link.click();
                         
-                        logDiv(`✅ ย่อสำเร็จ: ${file.name} (${Math.round(blob.size / 1024)} KB)`);
-                        resolve();
+                        logDiv(`✅ [${index}] สำเร็จ: ${file.name} (${Math.round(blob.size / 1024)} KB)`);
+                        
+                        // หน่วงเวลา 300 มิลลิวินาที ให้เบราว์เซอร์เซฟไฟล์ทัน
+                        setTimeout(resolve, 300);
                     }, file.type, qualityInput);
                 };
             };
         });
     }
-    logDiv('🎉 เสร็จสิ้นทุกรูปภาพแล้ว!');
+    logDiv('🎉 ดาวน์โหลดครบทุกรูปภาพแล้ว!');
 }
 </script>
 
