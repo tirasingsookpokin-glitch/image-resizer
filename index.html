@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Food Image Resizer (Square 800x800 + Black BG)</title>
+    <title>Food Image Resizer (Smart Skip Small Files)</title>
     <style>
         body { font-family: sans-serif, Tahoma; padding: 20px; background: #f4f4f9; color: #333; max-width: 600px; margin: auto; }
         .card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 15px; }
@@ -17,7 +17,7 @@
 </head>
 <body>
 
-    <h2>🍱 ปรับรูปอาหารเป็น 800x800 (พื้นหลังดำ จัดกึ่งกลาง)</h2>
+    <h2>🍱 ปรับรูปอาหาร (ข้ามรูปเล็กอัตโนมัติ)</h2>
     
     <div class="card">
         <label>1. เลือกรูปภาพ (หลายรูปพร้อมกัน):</label>
@@ -34,8 +34,8 @@
 <script>
 async function processImages() {
     const fileInput = document.getElementById('upload');
-    const targetSize = 800; // ล็อกขนาดมาตรฐาน 800x800 พิกเซล
-    const qualityInput = 0.8; // คุณภาพความคมชัด 80%
+    const targetSize = 800;
+    const qualityInput = 0.8;
     const logDiv = (msg) => document.getElementById('log').innerHTML += msg + '<br>';
 
     if (fileInput.files.length === 0) {
@@ -43,7 +43,7 @@ async function processImages() {
         return;
     }
 
-    document.getElementById('log').innerHTML = 'กำลังเริ่มประมวลผล...<br>';
+    document.getElementById('log').innerHTML = 'กำลังเริ่มตรวจสอบและประมวลผล...<br>';
 
     for (let file of fileInput.files) {
         await new Promise((resolve) => {
@@ -53,44 +53,53 @@ async function processImages() {
                 const img = new Image();
                 img.src = event.target.result;
                 img.onload = () => {
+                    const fileSizeKB = file.size / 1024;
+                    const imgWidth = img.width;
+                    const imgHeight = img.height;
+
+                    // เงื่อนไขกันพลาด: ถ้ารูปมีขนาดไฟล์ต่ำกว่า 200 KB หรือ กว้าง/สูง ไม่เกิน 800 px ให้ข้ามการปรับแต่ง (ใช้ไฟล์เดิมเป๊ะๆ)
+                    if (fileSizeKB < 200 || (imgWidth <= targetSize && imgHeight <= targetSize)) {
+                        const link = document.createElement('a');
+                        link.href = event.target.result;
+                        link.download = file.name;
+                        link.click();
+                        
+                        logDiv(`⏭️ ข้าม (รูปเล็กอยู่แล้ว): ${file.name} (${Math.round(fileSizeKB)} KB, ${imgWidth}x${imgHeight}px)`);
+                        resolve();
+                        return;
+                    }
+
+                    // ถ้ารูปใหญ่กว่าเกณฑ์ ค่อยนำมาปรับขนาด 800x800 + เติมขอบดำ
                     const canvas = document.createElement('canvas');
                     canvas.width = targetSize;
                     canvas.height = targetSize;
                     const ctx = canvas.getContext('2d');
 
-                    // 1. เติมพื้นหลังสีดำให้เต็มกรอบ 800x800 ก่อน
                     ctx.fillStyle = '#000000';
                     ctx.fillRect(0, 0, targetSize, targetSize);
 
-                    // 2. คำนวณสเกลภาพต้นฉบับไม่ให้เบี้ยว
-                    let w = img.width;
-                    let h = img.height;
                     let drawW = targetSize;
                     let drawH = targetSize;
                     let offsetX = 0;
                     let offsetY = 0;
 
-                    if (w > h) {
-                        // รูปแนวนอน: ปรับความกว้างให้เต็ม 800 แล้วคำนวณความสูงตามสเกล
-                        drawH = Math.round((h * targetSize) / w);
-                        offsetY = Math.round((targetSize - drawH) / 2); // จัดให้อยู่กึ่งกลางแนวตั้ง
+                    if (imgWidth > imgHeight) {
+                        drawH = Math.round((imgHeight * targetSize) / imgWidth);
+                        offsetY = Math.round((targetSize - drawH) / 2);
                     } else {
-                        // รูปแนวตั้งหรือจัตุรัส: ปรับความสูงให้เต็ม 800 แล้วคำนวณความกว้างตามสเกล
-                        drawW = Math.round((w * targetSize) / h);
-                        offsetX = Math.round((targetSize - drawW) / 2); // จัดให้อยู่กึ่งกลางแนวนอน
+                        drawW = Math.round((imgWidth * targetSize) / imgHeight);
+                        offsetX = Math.round((targetSize - drawW) / 2);
                     }
 
-                    // 3. วาดรูปลงบนผ้าใบตรงกลาง พื้นที่เหลือจะเป็นสีดำอัตโนมัติ
                     ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
 
-                    // 4. บันทึกผลลัพธ์เป็นไฟล์เดิมและใช้ชื่อเดิมเป๊ะๆ
                     canvas.toBlob((blob) => {
                         const link = document.createElement('a');
                         link.href = URL.createObjectURL(blob);
-                        link.download = file.name; // คงชื่อเดิม
+                        link.download = file.name;
                         link.click();
                         
-                        logDiv(`✅ สำเร็จ: ${file.name} (${Math.round(blob.size / 1024)} KB)`);
+                        logDiv(`✅ ย่อสำเร็จ: ${file.name} (${Math.round(blob.size / 1024)} KB)`);
                         resolve();
                     }, file.type, qualityInput);
                 };
