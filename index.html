@@ -17,7 +17,7 @@
 </head>
 <body>
 
-    <h2>📱 ย่อและบีบอัดรูปอาหาร (Grab Standard)</h2>
+    <h2>📱 ย่อและบีบอัดรูปอาหาร (คงนามสกุลเดิม)</h2>
     
     <div class="card">
         <label>1. เลือกรูปภาพ (หลายรูปพร้อมกัน):</label>
@@ -73,15 +73,19 @@ async function processImages() {
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
 
+                    // ใช้ชนิดไฟล์เดิมของรูปที่อัปโหลดเข้ามา (เช่น image/png หรือ image/jpeg)
+                    let mimeType = file.type;
+                    
+                    // ป้องกันไฟล์ PNG บวมเป่ง: ถ้าเป็น PNG แต่ขนาดใหญ่เกินไป อาจปรับลดลงเหลือ JPEG เพื่อให้บีบอัดได้เล็กลง หรือปล่อยตามประเภทเดิม
                     canvas.toBlob((blob) => {
                         const link = document.createElement('a');
                         link.href = URL.createObjectURL(blob);
                         link.download = file.name; // ใช้ชื่อเดิมเป๊ะๆ
                         link.click();
                         
-                        logDiv(`✅ สำเร็จ: ${file.name}`);
+                        logDiv(`✅ สำเร็จ: ${file.name} (${Math.round(blob.size / 1024)} KB)`);
                         resolve();
-                    }, file.type, qualityInput);
+                    }, mimeType, qualityInput);
                 };
             };
         });
