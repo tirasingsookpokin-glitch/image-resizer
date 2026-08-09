@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resize & Upload to Google Drive</title>
+    <title>Batch Image Resizer & Compressor</title>
     <style>
         body { font-family: sans-serif, Tahoma; padding: 20px; background: #f4f4f9; color: #333; max-width: 600px; margin: auto; }
         .card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 15px; }
@@ -11,157 +11,84 @@
         label { display: block; margin-top: 10px; font-size: 0.9rem; font-weight: bold; }
         input[type="number"], input[type="file"] { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
         button { background: #28a745; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
-        button.secondary { background: #4285F4; }
+        button:active { background: #218838; }
         #log { margin-top: 15px; font-size: 0.85rem; background: #e9ecef; padding: 10px; border-radius: 6px; max-height: 150px; overflow-y: auto; }
     </style>
 </head>
 <body>
 
-    <h2>📱 ย่อรูปอาหาร + ส่งเข้า Google Drive</h2>
+    <h2>📱 ย่อและบีบอัดรูปอาหาร (Grab Standard)</h2>
     
     <div class="card">
-        <button class="secondary" onclick="handleAuthClick()">1. เชื่อมต่อบัญชี Google Drive</button>
-        <p id="authStatus" style="font-size: 0.8rem; color: #666; text-align: center;">สถานะ: ยังไม่ได้เชื่อมต่อ</p>
-
-        <label>2. เลือกรูปภาพ (หลายรูปพร้อมกัน):</label>
+        <label>1. เลือกรูปภาพ (หลายรูปพร้อมกัน):</label>
         <input type="file" id="upload" multiple accept="image/*">
 
-        <label>3. ความกว้างสูงสุด (Pixel):</label>
+        <label>2. ความกว้างสูงสุด (Pixel):</label>
         <input type="number" id="maxWidth" value="800">
 
-        <label>4. คุณภาพไฟล์ (0.1 ถึง 1.0):</label>
+        <label>3. คุณภาพไฟล์ (0.1 ถึง 1.0):</label>
         <input type="number" id="quality" value="0.8" step="0.1" min="0.1" max="1.0">
 
-        <button onclick="processAndUpload()">เริ่มย่อและอัปโหลดเข้า Drive</button>
+        <button onclick="processImages()">เริ่มประมวลผลและดาวน์โหลด</button>
     </div>
 
     <div class="card">
         <h3>สถานะการทำงาน:</h3>
-        <div id="log">กรุณาเชื่อมต่อ Google Drive ก่อน...</div>
+        <div id="log">รอเลือกรูปภาพ...</div>
     </div>
 
-    <!-- โหลด Google API Client Libraries -->
-    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
-
 <script>
-    // หมายเหตุ: การใช้งานจริงต้องไปสร้าง Client ID จาก Google Cloud Console มาใส่แทนที่ตรงนี้
-    const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com'; 
-    const API_KEY = 'YOUR_API_KEY';
-    const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
-    const SCOPES = 'https://www.googleapis.com/auth/file'; // หรือสิทธิ์ drive.file
+async function processImages() {
+    const fileInput = document.getElementById('upload');
+    const maxWidthInput = parseInt(document.getElementById('maxWidth').value);
+    const qualityInput = parseFloat(document.getElementById('quality').value);
+    const logDiv = (msg) => document.getElementById('log').innerHTML += msg + '<br>';
 
-    let tokenClient;
-    let gapiInited = false;
-    let gisInited = false;
-
-    function gapiLoaded() {
-        gapi.load('client', initializeGapiClient);
+    if (fileInput.files.length === 0) {
+        alert('กรุณาเลือกรูปภาพอย่างน้อย 1 รูป');
+        return;
     }
 
-    async function initializeGapiClient() {
-        await gapi.client.init({
-            apiKey: API_KEY,
-            discoveryDocs: [DISCOVERY_DOC],
-        });
-        gapiInited = true;
-    }
+    document.getElementById('log').innerHTML = 'กำลังเริ่มประมวลผล...<br>';
 
-    function gisLoaded() {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/drive.file',
-            callback: '', // defined later
-        });
-        gisInited = true;
-    }
+    for (let file of fileInput.files) {
+        await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    let width = img.width;
+                    let height = img.height;
 
-    function handleAuthClick() {
-        tokenClient.callback = async (resp) => {
-            if (resp.error !== undefined) {
-                throw (resp);
-            }
-            document.getElementById('authStatus').innerText = 'สถานะ: เชื่อมต่อ Google Drive สำเร็จแล้ว ✅';
-            document.getElementById('log').innerHTML = 'พร้อมใช้งาน เลือกรูปภาพได้เลย';
-        };
+                    if (width > maxWidthInput) {
+                        height = Math.round((height * maxWidthInput) / width);
+                        width = maxWidthInput;
+                    }
 
-        if (gapi.client.getToken() === null) {
-            tokenClient.requestAccessToken({prompt: 'consent'});
-        } else {
-            tokenClient.requestAccessToken({prompt: ''});
-        }
-    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
 
-    async function processAndUpload() {
-        const fileInput = document.getElementById('upload');
-        const maxWidthInput = parseInt(document.getElementById('maxWidth').value);
-        const qualityInput = parseFloat(document.getElementById('quality').value);
-        const logDiv = (msg) => document.getElementById('log').innerHTML += msg + '<br>';
-
-        if (fileInput.files.length === 0) {
-            alert('กรุณาเลือกรูปภาพอย่างน้อย 1 รูป');
-            return;
-        }
-
-        logDiv('กำลังเริ่มประมวลผลรูปภาพ...');
-
-        for (let file of fileInput.files) {
-            await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = async () => {
-                        let width = img.width;
-                        let height = img.height;
-
-                        if (width > maxWidthInput) {
-                            height = Math.round((height * maxWidthInput) / width);
-                            width = maxWidthInput;
-                        }
-
-                        const canvas = document.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-
-                        canvas.toBlob(async (blob) => {
-                            // อัปโหลด Blob เข้า Google Drive ผ่าน API
-                            try {
-                                const metadata = {
-                                    'name': file.name, // ใช้ชื่อเดิม
-                                    'mimeType': file.type
-                                };
-
-                                const form = new FormData();
-                                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'type/json' }));
-                                form.append('file', blob);
-
-                                const accessToken = gapi.client.getToken().access_token;
-                                const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                                          method: 'POST',
-                                          headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
-                                          body: form
-                                });
-                                
-                                if(response.ok) {
-                                    logDiv(`✅ อัปโหลดสำเร็จ: ${file.name}`);
-                                } else {
-                                    logDiv(`❌ อัปโหลดไม่สำเร็จ: ${file.name}`);
-                                }
-                            } catch (err) {
-                                logDiv(`⚠️ เกิดข้อผิดพลาดกับ ${file.name}: ${err.message}`);
-                            }
-                            resolve();
-                        }, file.type, qualityInput);
-                    };
+                    canvas.toBlob((blob) => {
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = file.name; // ใช้ชื่อเดิมเป๊ะๆ
+                        link.click();
+                        
+                        logDiv(`✅ สำเร็จ: ${file.name}`);
+                        resolve();
+                    }, file.type, qualityInput);
                 };
-            });
-        }
-        logDiv('🎉 อัปโหลดเข้า Google Drive ครบทุกรูปแล้ว!');
+            };
+        });
     }
+    logDiv('🎉 เสร็จสิ้นทุกรูปภาพแล้ว!');
+}
 </script>
+
 </body>
 </html>
