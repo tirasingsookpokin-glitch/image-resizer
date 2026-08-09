@@ -1,0 +1,14 @@
+{
+  "background_color": "#ffffff",
+  "dir": "auto",
+  "display": "standalone",
+  "name": "TiraPix",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "TiraPix",
+  "start_url": "https://tirasingsookpokin-glitch.github.io/image-resizer/",
+  "theme_color": "#ffffff",
+  "id": "TiraPix",
+  "description": "ลดขนาดรูปภาพที่ถ่ายจากมือถือ",
+  "lang": "th"
+}
