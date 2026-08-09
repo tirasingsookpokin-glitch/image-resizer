@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Batch Image Resizer & Compressor</title>
+    <title>Food Image Resizer (Square 800x800 + Black BG)</title>
     <style>
         body { font-family: sans-serif, Tahoma; padding: 20px; background: #f4f4f9; color: #333; max-width: 600px; margin: auto; }
         .card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 15px; }
         h2 { font-size: 1.2rem; margin-top: 0; color: #007bff; }
         label { display: block; margin-top: 10px; font-size: 0.9rem; font-weight: bold; }
-        input[type="number"], input[type="file"] { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
+        input[type="file"] { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
         button { background: #28a745; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
         button:active { background: #218838; }
         #log { margin-top: 15px; font-size: 0.85rem; background: #e9ecef; padding: 10px; border-radius: 6px; max-height: 150px; overflow-y: auto; }
@@ -17,17 +17,11 @@
 </head>
 <body>
 
-    <h2>📱 ย่อและบีบอัดรูปอาหาร (คงนามสกุลเดิม)</h2>
+    <h2>🍱 ปรับรูปอาหารเป็น 800x800 (พื้นหลังดำ จัดกึ่งกลาง)</h2>
     
     <div class="card">
         <label>1. เลือกรูปภาพ (หลายรูปพร้อมกัน):</label>
         <input type="file" id="upload" multiple accept="image/*">
-
-        <label>2. ความกว้างสูงสุด (Pixel):</label>
-        <input type="number" id="maxWidth" value="800">
-
-        <label>3. คุณภาพไฟล์ (0.1 ถึง 1.0):</label>
-        <input type="number" id="quality" value="0.8" step="0.1" min="0.1" max="1.0">
 
         <button onclick="processImages()">เริ่มประมวลผลและดาวน์โหลด</button>
     </div>
@@ -40,8 +34,8 @@
 <script>
 async function processImages() {
     const fileInput = document.getElementById('upload');
-    const maxWidthInput = parseInt(document.getElementById('maxWidth').value);
-    const qualityInput = parseFloat(document.getElementById('quality').value);
+    const targetSize = 800; // ล็อกขนาดมาตรฐาน 800x800 พิกเซล
+    const qualityInput = 0.8; // คุณภาพความคมชัด 80%
     const logDiv = (msg) => document.getElementById('log').innerHTML += msg + '<br>';
 
     if (fileInput.files.length === 0) {
@@ -59,33 +53,46 @@ async function processImages() {
                 const img = new Image();
                 img.src = event.target.result;
                 img.onload = () => {
-                    let width = img.width;
-                    let height = img.height;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = targetSize;
+                    canvas.height = targetSize;
+                    const ctx = canvas.getContext('2d');
 
-                    if (width > maxWidthInput) {
-                        height = Math.round((height * maxWidthInput) / width);
-                        width = maxWidthInput;
+                    // 1. เติมพื้นหลังสีดำให้เต็มกรอบ 800x800 ก่อน
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(0, 0, targetSize, targetSize);
+
+                    // 2. คำนวณสเกลภาพต้นฉบับไม่ให้เบี้ยว
+                    let w = img.width;
+                    let h = img.height;
+                    let drawW = targetSize;
+                    let drawH = targetSize;
+                    let offsetX = 0;
+                    let offsetY = 0;
+
+                    if (w > h) {
+                        // รูปแนวนอน: ปรับความกว้างให้เต็ม 800 แล้วคำนวณความสูงตามสเกล
+                        drawH = Math.round((h * targetSize) / w);
+                        offsetY = Math.round((targetSize - drawH) / 2); // จัดให้อยู่กึ่งกลางแนวตั้ง
+                    } else {
+                        // รูปแนวตั้งหรือจัตุรัส: ปรับความสูงให้เต็ม 800 แล้วคำนวณความกว้างตามสเกล
+                        drawW = Math.round((w * targetSize) / h);
+                        offsetX = Math.round((targetSize - drawW) / 2); // จัดให้อยู่กึ่งกลางแนวนอน
                     }
 
-                    const canvas = document.createElement('canvas');
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
+                    // 3. วาดรูปลงบนผ้าใบตรงกลาง พื้นที่เหลือจะเป็นสีดำอัตโนมัติ
+                    ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
 
-                    // ใช้ชนิดไฟล์เดิมของรูปที่อัปโหลดเข้ามา (เช่น image/png หรือ image/jpeg)
-                    let mimeType = file.type;
-                    
-                    // ป้องกันไฟล์ PNG บวมเป่ง: ถ้าเป็น PNG แต่ขนาดใหญ่เกินไป อาจปรับลดลงเหลือ JPEG เพื่อให้บีบอัดได้เล็กลง หรือปล่อยตามประเภทเดิม
+                    // 4. บันทึกผลลัพธ์เป็นไฟล์เดิมและใช้ชื่อเดิมเป๊ะๆ
                     canvas.toBlob((blob) => {
                         const link = document.createElement('a');
                         link.href = URL.createObjectURL(blob);
-                        link.download = file.name; // ใช้ชื่อเดิมเป๊ะๆ
+                        link.download = file.name; // คงชื่อเดิม
                         link.click();
                         
                         logDiv(`✅ สำเร็จ: ${file.name} (${Math.round(blob.size / 1024)} KB)`);
                         resolve();
-                    }, mimeType, qualityInput);
+                    }, file.type, qualityInput);
                 };
             };
         });
